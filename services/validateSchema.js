@@ -8,13 +8,13 @@ const contactAddSchema = Joi.object({
 });
 
 const contactUpdateFavoriteSchema = Joi.object({
-    favorite: Joi.boolean().required(),
+    favorite: Joi.boolean().required().messages({'any.required': `Missing field favorite`}),
 });
 
 const contactUpdateSchema = Joi.object({
-    name: Joi.string(),
-    email: Joi.string(),
-    phone: Joi.string(),
+    name: Joi.string().required(),
+    email: Joi.string().required(),
+    phone: Joi.string().required(),
     favorite: Joi.boolean(),
 })
     .or('name', 'email', 'phone', 'favorite')
