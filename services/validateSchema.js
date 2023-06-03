@@ -17,8 +17,7 @@ const contactUpdateSchema = Joi.object({
     phone: Joi.string().required(),
     favorite: Joi.boolean(),
 })
-    .or('name', 'email', 'phone', 'favorite')
-    .error(new Error('Missing fields'));
+
 
 module.exports = {
     contactAddSchema,
