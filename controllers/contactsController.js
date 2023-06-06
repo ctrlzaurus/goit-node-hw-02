@@ -4,9 +4,7 @@ const Contact = require('../models/contacts');
 
 const getContacts = async (req, res, next) => {
     const { id: owner } = req.user;
-    const { page=1, limit=20 } = req.query;
-    const skip = (page -1) * limit;
-    const contacts = await Contact.find({ owner }, { skip, limit }).populate("owner", "email");
+    const contacts = await Contact.find({ owner }).populate("owner", "email");
     res.json(contacts);
 }
 

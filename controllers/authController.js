@@ -19,7 +19,10 @@ const register = async(req, res) => {
     const newUser = await User.create({ email, password: hashedPassword });
 
     res.status(201).json({
-        email: newUser.email,
+        user: {
+            email: newUser.email,
+            subscription: newUser.subscription,
+        }
     })
 };
 
@@ -45,25 +48,32 @@ const login = async(req, res) => {
     await User.findByIdAndUpdate(user.id, { token });
 
     res.json({
-        token
+        token,
+        user: {
+            email: email,
+            subscription: user.subscription,
+        }
     })
 };
 
 const getCurrent = async(req, res, next) => {
-    const { name, email } = req.user;
+    const { email } = req.user;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw HttpError(401, 'Not authorized');
+    }
 
     res.json({
-        name,
-        email
+        email,
+        subscription: user.subscription,
     })
 }
 
 const logout = async (req, res) => {
     const { _id: id } = req.user;
     await User.findByIdAndUpdate(id, {token: ''});
-    res.json({
-        message: 'Logout successed',
-    })
+    res.status(204).send();
 }
 
 module.exports = {
