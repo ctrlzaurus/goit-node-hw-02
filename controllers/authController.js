@@ -86,36 +86,48 @@ const logout = async (req, res) => {
 
 const updateAvatar = async (req, res) => {
     const { path: tempPath, originalname } = req.file;
-    const { _id, email } = req.user;
+    const { _id } = req.user;
     const resultFilename = `${_id}_${originalname}`;
     const resultDir = path.join(avatarsDir, resultFilename);
+
+    const avatar = await Jimp.read(tempPath)
+	avatar.cover(250, 250).write(tempPath);
+
+    await fs.rename(tempPath, resultDir);
+	const avatarURL = path.join("avatars", resultFilename);
+
+	await User.findByIdAndUpdate(_id, { avatarURL });
+	res.status(200).json({ avatarURL });
     // const resultDir = path.join(avatarsDir, originalname);
-    const avatarURL = `/avatars/${resultFilename}`;
+
+    // const avatarURL = `/avatars/${resultFilename}`;
+
     // const avatarURL = `/avatars/${originalname}`;
     // const avatarURL = path.join('avatars', originalname);
     // fs.rename(tempPath, resultDir);
-    try {
-        const image = await Jimp.read(tempPath);
-        image.resize(250, 250);
-        await image.writeAsync(resultDir);
 
-        fs.unlinkSync(tempPath);
+    // try {
+    //     const image = await Jimp.read(tempPath);
+    //     image.resize(250, 250);
+    //     await image.writeAsync(resultDir);
 
-        await User.findByIdAndUpdate(_id, { avatarURL });
-        const user = await User.findOne({ email });
-        if (!user) {
-            throw HttpError(401, 'Not authorized');
-        }
+    //     fs.unlinkSync(tempPath);
 
-        res.json({
-            avatarURL,
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({
-            error: 'wrong',
-        });
-    }
+    //     await User.findByIdAndUpdate(_id, { avatarURL });
+    //     const user = await User.findOne({ email });
+    //     if (!user) {
+    //         throw HttpError(401, 'Not authorized');
+    //     }
+
+    //     res.json({
+    //         avatarURL,
+    //     });
+    // } catch (error) {
+    //     console.error(error);
+    //     res.status(500).json({
+    //         error: 'wrong',
+    //     });
+    // }
 };
     // await User.findByIdAndUpdate(_id, { avatarURL });
 
