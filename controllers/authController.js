@@ -4,7 +4,12 @@ const HttpError = require("../services/HttpError");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { SECRET_KEY } = process.env;
+const gravatar = require('gravatar');
+const fs = require('fs/promises');
+const path = require('path');
+const Jimp = require("jimp");
 
+const avatarsDir = path.resolve('public', 'avatars');
 
 const register = async(req, res) => {
     const { password, email } = req.body;
@@ -14,9 +19,11 @@ const register = async(req, res) => {
         throw HttpError(409, 'Email in use')
     }
 
+    const avatarURL = gravatar.url(email);
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = await User.create({ email, password: hashedPassword });
+    const newUser = await User.create({ email, password: hashedPassword, avatarURL });
 
     res.status(201).json({
         user: {
@@ -57,7 +64,7 @@ const login = async(req, res) => {
 };
 
 const getCurrent = async(req, res, next) => {
-    const { email } = req.user;
+    const { email, avatarURL } = req.user;
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -67,6 +74,7 @@ const getCurrent = async(req, res, next) => {
     res.json({
         email,
         subscription: user.subscription,
+        avatarURL,
     })
 }
 
@@ -76,9 +84,66 @@ const logout = async (req, res) => {
     res.status(204).send();
 }
 
+const updateAvatar = async (req, res) => {
+    const { path: tempPath, originalname } = req.file;
+    const { _id } = req.user;
+    const resultFilename = `${_id}_${originalname}`;
+    const resultDir = path.join(avatarsDir, resultFilename);
+
+    const avatar = await Jimp.read(tempPath)
+	avatar.cover(250, 250).write(tempPath);
+
+    await fs.rename(tempPath, resultDir);
+	const avatarURL = path.join("avatars", resultFilename);
+
+	await User.findByIdAndUpdate(_id, { avatarURL });
+	res.status(200).json({ avatarURL });
+    // const resultDir = path.join(avatarsDir, originalname);
+
+    // const avatarURL = `/avatars/${resultFilename}`;
+
+    // const avatarURL = `/avatars/${originalname}`;
+    // const avatarURL = path.join('avatars', originalname);
+    // fs.rename(tempPath, resultDir);
+
+    // try {
+    //     const image = await Jimp.read(tempPath);
+    //     image.resize(250, 250);
+    //     await image.writeAsync(resultDir);
+
+    //     fs.unlinkSync(tempPath);
+
+    //     await User.findByIdAndUpdate(_id, { avatarURL });
+    //     const user = await User.findOne({ email });
+    //     if (!user) {
+    //         throw HttpError(401, 'Not authorized');
+    //     }
+
+    //     res.json({
+    //         avatarURL,
+    //     });
+    // } catch (error) {
+    //     console.error(error);
+    //     res.status(500).json({
+    //         error: 'wrong',
+    //     });
+    // }
+};
+    // await User.findByIdAndUpdate(_id, { avatarURL });
+
+    // const user = await User.findOne({ email });
+    // if (!user) {
+    //     throw HttpError(401, 'Not authorized');
+    // }
+//     res.json({
+//         avatarURL,
+//     })
+// }
+
 module.exports = {
     register: ctrlWrapper(register),
     login: ctrlWrapper(login),
     getCurrent: ctrlWrapper(getCurrent),
     logout: ctrlWrapper(logout),
+    updateAvatar: ctrlWrapper(updateAvatar),
 }
