@@ -3,13 +3,15 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../../controllers/authController');
 const validateBody = require('../../utils/validateBody');
-const { userRegisterSchema, userLoginSchema } = require('../../models/user');
+const { userRegisterSchema, userLoginSchema, emailSchema } = require('../../models/user');
 const authenticate = require('../../middlewares/authenticate');
 const upload = require('../../middlewares/upload');
 
 router.post('/register', validateBody(userRegisterSchema), authController.register);
 
-router.get('verify/:verificationToken', authController.verify);
+router.get('/verify/:verificationToken', authController.verify);
+
+router.post('/verification', validateBody(emailSchema), authController.resendVerifyEmail);
 
 router.post('/login', validateBody(userLoginSchema), authController.login);
 

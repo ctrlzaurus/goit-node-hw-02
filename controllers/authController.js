@@ -3,13 +3,14 @@ const { User } = require('../models/user');
 const HttpError = require("../services/HttpError");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { SECRET_KEY, BASE_URL, PORT } = process.env;
+const { SECRET_KEY } = process.env;
 const gravatar = require('gravatar');
 const fs = require('fs/promises');
 const path = require('path');
 const Jimp = require("jimp");
 const { v4: uuidv4 } = require('uuid');
 const sendEmail = require("../services/sendEmail");
+const createVerificationEmail = require("../services/createVerificationEmail");
 
 const avatarsDir = path.resolve('public', 'avatars');
 
@@ -17,27 +18,19 @@ const register = async(req, res) => {
     const { password, email } = req.body;
 
     const user = await User.findOne({ email })
+    
     if(user) {
         throw HttpError(409, 'Email in use')
     }
 
     const avatarURL = gravatar.url(email);
-
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const verificationToken = uuidv4();
-
     const newUser = await User.create({ email, password: hashedPassword, avatarURL, verificationToken });
 
-    const verifyLink = `${BASE_URL}:${PORT}/users/verify/${verificationToken}`;
+    const verifyEmail = createVerificationEmail(newUser.verificationToken, newUser.email);
 
-    const verifyEmail = {
-        to: email,
-        subject: 'Varification',
-        html: verifyLink,
-    }
-
-    console.log(await sendEmail(verifyEmail));
+    await sendEmail(verifyEmail);
 
     res.status(201).json({
         user: {
@@ -53,7 +46,7 @@ const verify = async (req, res) => {
     const user = await User.findOne({ verificationToken });
 
     if(!user) {
-        throw HttpError(404)
+        throw HttpError(404, 'User not found')
     }
 
     await User.findByIdAndUpdate(user._id, { verify: true, verificationToken: '' });
@@ -69,6 +62,10 @@ const login = async(req, res) => {
     const user = await User.findOne({ email })
     if(!user) {
         throw HttpError(401, 'Email or password is wrong')
+    }
+
+    if(!user.verify) {
+        throw HttpError(404, 'User not found')
     }
 
     const passwordCompareResalt = await bcrypt.compare(password, user.password);
@@ -128,47 +125,29 @@ const updateAvatar = async (req, res) => {
 
 	await User.findByIdAndUpdate(_id, { avatarURL });
 	res.status(200).json({ avatarURL });
-    // const resultDir = path.join(avatarsDir, originalname);
+}
 
-    // const avatarURL = `/avatars/${resultFilename}`;
+const resendVerifyEmail = async (req, res) => {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
 
-    // const avatarURL = `/avatars/${originalname}`;
-    // const avatarURL = path.join('avatars', originalname);
-    // fs.rename(tempPath, resultDir);
+    if(!user) {
+        throw HttpError(404);
+    }
 
-    // try {
-    //     const image = await Jimp.read(tempPath);
-    //     image.resize(250, 250);
-    //     await image.writeAsync(resultDir);
+    if(user.verify) {
+        throw HttpError(400, 'Verification has already been passed');
+    }
 
-    //     fs.unlinkSync(tempPath);
 
-    //     await User.findByIdAndUpdate(_id, { avatarURL });
-    //     const user = await User.findOne({ email });
-    //     if (!user) {
-    //         throw HttpError(401, 'Not authorized');
-    //     }
+    const verifyEmail = createVerificationEmail(user.verificationToken, user.email);
 
-    //     res.json({
-    //         avatarURL,
-    //     });
-    // } catch (error) {
-    //     console.error(error);
-    //     res.status(500).json({
-    //         error: 'wrong',
-    //     });
-    // }
-};
-    // await User.findByIdAndUpdate(_id, { avatarURL });
+    await sendEmail(verifyEmail);
 
-    // const user = await User.findOne({ email });
-    // if (!user) {
-    //     throw HttpError(401, 'Not authorized');
-    // }
-//     res.json({
-//         avatarURL,
-//     })
-// }
+    res.json({
+        message: 'Verification email sent'
+    })
+}
 
 module.exports = {
     register: ctrlWrapper(register),
@@ -177,4 +156,5 @@ module.exports = {
     logout: ctrlWrapper(logout),
     updateAvatar: ctrlWrapper(updateAvatar),
     verify: ctrlWrapper(verify),
+    resendVerifyEmail: ctrlWrapper(resendVerifyEmail),
 }
