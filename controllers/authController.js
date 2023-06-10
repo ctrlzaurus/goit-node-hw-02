@@ -3,11 +3,13 @@ const { User } = require('../models/user');
 const HttpError = require("../services/HttpError");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { SECRET_KEY } = process.env;
+const { SECRET_KEY, BASE_URL, PORT } = process.env;
 const gravatar = require('gravatar');
 const fs = require('fs/promises');
 const path = require('path');
 const Jimp = require("jimp");
+const { v4: uuidv4 } = require('uuid');
+const sendEmail = require("../services/sendEmail");
 
 const avatarsDir = path.resolve('public', 'avatars');
 
@@ -23,7 +25,19 @@ const register = async(req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = await User.create({ email, password: hashedPassword, avatarURL });
+    const verificationToken = uuidv4();
+
+    const newUser = await User.create({ email, password: hashedPassword, avatarURL, verificationToken });
+
+    const verifyLink = `${BASE_URL}:${PORT}/users/verify/${verificationToken}`;
+
+    const verifyEmail = {
+        to: email,
+        subject: 'Varification',
+        html: verifyLink,
+    }
+
+    console.log(await sendEmail(verifyEmail));
 
     res.status(201).json({
         user: {
@@ -32,6 +46,22 @@ const register = async(req, res) => {
         }
     })
 };
+
+const verify = async (req, res) => {
+    const { verificationToken } = req.params;
+
+    const user = await User.findOne({ verificationToken });
+
+    if(!user) {
+        throw HttpError(404)
+    }
+
+    await User.findByIdAndUpdate(user._id, { verify: true, verificationToken: '' });
+
+    res.json({
+        message: 'Verification successful'
+    })
+}
 
 const login = async(req, res) => {
     const { email, password } = req.body;
@@ -91,7 +121,7 @@ const updateAvatar = async (req, res) => {
     const resultDir = path.join(avatarsDir, resultFilename);
 
     const avatar = await Jimp.read(tempPath)
-	avatar.cover(250, 250).write(tempPath);
+	avatar.resize(250, 250).write(tempPath);
 
     await fs.rename(tempPath, resultDir);
 	const avatarURL = path.join("avatars", resultFilename);
@@ -146,4 +176,5 @@ module.exports = {
     getCurrent: ctrlWrapper(getCurrent),
     logout: ctrlWrapper(logout),
     updateAvatar: ctrlWrapper(updateAvatar),
+    verify: ctrlWrapper(verify),
 }
