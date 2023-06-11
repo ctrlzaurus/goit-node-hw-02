@@ -11,7 +11,7 @@ router.post('/register', validateBody(userRegisterSchema), authController.regist
 
 router.get('/verify/:verificationToken', authController.verify);
 
-router.post('/verification', validateBody(emailSchema), authController.resendVerifyEmail);
+router.post('/verify', validateBody(emailSchema), authController.resendVerifyEmail);
 
 router.post('/login', validateBody(userLoginSchema), authController.login);
 
